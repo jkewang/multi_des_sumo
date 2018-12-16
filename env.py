@@ -20,28 +20,43 @@ class TrafficEnv(object):
 
     def __init__(self):
         traci.start(sumoCmd)
-
         self.cross_mapping={
-            "-gneE1" : "cross_3",
-            "gneE8" : "cross_4",
-            "gneE10" : "cross_5",
-            "gneE5" : "cross_2",
-            "gneE6" : "cross_1"
+            "-gneE0": "cross_0",
+            "gneE0": "cross_3",
+            "-gneE1": "cross_3",
+            "gneE1": "cross_6",
+            "-gneE2": "cross_6",
+            "gneE2": "cross_7",
+            "-gneE3": "cross_7",
+            "gneE3": "cross_8",
+            "-gneE4": "cross_8",
+            "gneE4": "cross_5",
+            "-gneE5": "cross_5",
+            "gneE5": "cross_2",
+            "-gneE6": "cross_2",
+            "gneE6": "cross_1",
+            "-gneE7": "cross_1",
+            "gneE7": "cross_0",
+            "-gneE8": "cross_3",
+            "gneE8": "cross_4",
+            "-gneE9": "cross_4",
+            "gneE9": "cross_7",
+            "-gneE10": "cross_4",
+            "gneE10": "cross_5",
+            "-gneE11": "cross_4",
+            "gneE11": "cross_1"
         }
-        self.light_mapping={
-            "cross_3":-3,
-            "cross_4":-3,
-            "cross_5":-1,
-            "cross_2":-1,
-            "cross_1": 1,
-            "cross_6": 1
-        }
+
         self.trafficPos_mapping={
+            "cross_0": [-1000, 1000],
+            "cross_1": [0, 1000],
+            "cross_2": [1000, 1000],
             "cross_3": [-1000,0],
             "cross_4": [0,0],
             "cross_5": [1000,0],
-            "cross_2": [1000,1000],
-            "cross_1": [0,1000]
+            "cross_6": [-1000,-1000],
+            "cross_7": [0,-1000],
+            "cross_8": [1000,-1000]
         }
 
         #Env --lanechange.duration
@@ -103,6 +118,9 @@ class TrafficEnv(object):
             edge = '0'
         dest_name = direct + "gneE" + edge
         print(dest_name)
+
+        pos = self.trafficPos_mapping[self.cross_mapping[dest_name]]
+        self.end_x,self.end_y = pos[0],pos[1]
 
         traci.vehicle.changeTarget("agent",dest_name)
         self.Route = traci.vehicle.getRoute(self.AgentId)
@@ -274,10 +292,27 @@ class TrafficEnv(object):
         breaklight = 0
         breakstop = 0
 
+        next_roadid = ""
+        for i in range(len(self.Route)):
+            if now_roadid == self.Route[i] and (i != len(self.Route)-1):
+                next_roadid = self.Route[i+1]
+
+        print("now_road:",now_roadid," next_road:",next_roadid)
         try:
             nextTlsId = self.cross_mapping[now_roadid]
             rygState = traci.trafficlight.getRedYellowGreenState(nextTlsId)
-            nextLight = rygState[self.light_mapping[nextTlsId]]
+            links = traci.trafficlight.getControlledLinks(nextTlsId)
+            index = 0
+            print(links)
+            for i in range(len(links)):
+                str_1 = links[i][0][0]
+                edge_1 = str_1[0:str_1.rfind("_")]
+                str_2 = links[i][0][1]
+                edge_2 = str_2[0:str_2.rfind("_")]
+                if edge_1 == now_roadid and edge_2 == next_roadid:
+                    index = i
+                    break
+            nextLight = rygState[index]
             x,y = self.trafficPos_mapping[nextTlsId][0],self.trafficPos_mapping[nextTlsId][1]
             x_v,y_v = traci.vehicle.getPosition(self.AgentId)
             #print("trying")
@@ -297,9 +332,19 @@ class TrafficEnv(object):
                 breakstop = 1
             else:
                 breakstop = 0
-
             rygState = traci.trafficlight.getRedYellowGreenState(self.lastTlsTd)
-            nextLight = rygState[self.light_mapping[self.lastTlsTd]]
+            links = traci.trafficlight.getControlledLinks(self.lastTlsTd)
+            index = 0
+            for i in range(len(links)):
+                str_1 = links[i][0][0]
+                edge_1 = str_1[0:str_1.rfind("_")]
+                str_2 = links[i][0][1]
+                edge_2 = str_2[0:str_2.rfind("_")]
+                if edge_1 == now_roadid and edge_2 == next_roadid:
+                    index = i
+                    break
+            nextLight = rygState[index]
+
             #nextLight='g'
             distance = 100
             if nextLight == ('r' or 'R'):
